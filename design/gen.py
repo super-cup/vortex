@@ -52,11 +52,15 @@ def funnel_mesh(nt=480, nv=120):
 
 
 def rail_mesh(offset, nt=720, nseg=6):
-    """沿锥面螺旋扫掠的矩形墙（护栏）。offset 为相对槽中心线的径向偏移。"""
+    """沿内壁螺旋扫掠的矩形墙（护栏）。
+
+    offset = 0    → 外护栏：从内壁向内凸出 RAIL_T
+    offset = GAP  → 内护栏：再向内 RAIL_GAP
+    """
     vs = np.linspace(0, 1, nt)
     th = theta_s(vs)
     Rc = r_cone(vs)
-    Rrail = Rc - RAIL_GAP/2 + offset
+    Rrail = Rc - WALL - RAIL_T/2 - offset
     Z = H*(1-vs)
     # 路径点
     P = np.stack([Rrail*np.cos(th), Rrail*np.sin(th), Z], 1)
@@ -88,13 +92,20 @@ def plate():
     return p
 
 
+def build_body():
+    f = funnel_mesh()
+    r1 = rail_mesh(0.0)
+    r2 = rail_mesh(RAIL_GAP)
+    return trimesh.boolean.union([f, r1, r2], engine="manifold")
+
+
 if __name__ == "__main__":
     f = funnel_mesh()
     print("funnel", len(f.faces), f.is_watertight, round(f.volume/1000, 1), "cm3")
-    r1 = rail_mesh(-RAIL_GAP/2)
-    r2 = rail_mesh(+RAIL_GAP/2)
+    r1 = rail_mesh(0.0)
+    r2 = rail_mesh(RAIL_GAP)
     print("rails", len(r1.faces), r1.is_watertight, len(r2.faces), r2.is_watertight)
-    body = trimesh.boolean.union([f, r1, r2], engine="manifold")
+    body = build_body()
     print("body", len(body.faces), body.is_watertight, round(body.volume/1000, 1), "cm3",
           "bounds", np.round(body.bounds, 1).tolist())
     body.export(os.path.join(OUT, "vortex_funnel.stl"))
